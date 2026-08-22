@@ -84,6 +84,7 @@ function loadSettings() {
     viewMode: 'split',
     galleryMode: 'collage',
     galleryRatio: '1:1',
+    linkFootnotes: false,
     favoriteThemes: [],
     custom: {},
     imageHost: { provider: '', config: {}, always: 'off' },

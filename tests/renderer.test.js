@@ -45,6 +45,61 @@ test('自定义内联样式不能逃逸成事件属性', () => {
   assert.match(html, /&quot; onmouseover=/)
 })
 
+test('三层以上嵌套列表输出微信安全的 section 结构，层级与顺序不丢失', () => {
+  // issue #4 复现用例：预览正确，但原生嵌套 ul/ol 粘贴到公众号会被扁平化、顺序错乱
+  const source = `- **chrome tip**: 自定义搜索 实现快搜emoji
+  - 效果就是在chrome搜索栏输入\`em foobar\`的时候, 直接打开emojidb.org 搜索"foobar"
+  - 实现这个效果很简单:
+    - 打开\`chrome://settings/searchEngines\`
+    - 在"Site search"下点击"Add"
+    - \`shortcut=em\` / \`URL=https://emojidb.org/%s-emojis\`
+  - 用这个方式可以随意增加自定义的搜索, 比如我就添加了\`pub\`和\`gh\`的搜索快捷方式
+    - 另外chrome还自带了\`@gemini\`/ \`@aimode\`用来快速提问`
+
+  const html = stripPreviewMeta(renderMarkdown(source, themes[0], { galleryMode: 'collage' }))
+
+  // 核心：绝不输出原生列表结构（微信会 list-paddingleft-1 扁平化）
+  assert.doesNotMatch(html, /<ul|<ol|<li|<ol[^>]*start=/)
+
+  // 每层缩进按深度写入行内样式：第 2 层 1.5em、第 3 层 3em
+  const depth2 = (html.match(/padding-left:1\.5em;/g) || []).length
+  const depth3 = (html.match(/padding-left:3em;/g) || []).length
+  assert.equal(depth2, 4, '应有 4 个第二层条目') // 效果就是 / 实现这个效果很简单: / 用这个方式... / 打开...(3层)
+  assert.equal(depth3, 4, '应有 4 个第三层条目') // 打开 / 在Site search / shortcut=em / 另外chrome
+
+  // 标记符号按深度区分：1 层 •、2 层 ○、3 层 ■
+  const bulletSeq = [...html.matchAll(/>([•○■])&nbsp;<\/span>/g)].map((m) => m[1])
+  assert.deepEqual(bulletSeq, ['•', '○', '○', '■', '■', '■', '○', '■'])
+
+  // 顺序与源码一致（扁平化是微信行为，我们输出的 DOM 顺序必须忠于原文）
+  const order = ['chrome tip', '效果就是在chrome搜索栏输入', '实现这个效果很简单', 'chrome://settings/searchEngines', 'Site search', 'shortcut=em', '用这个方式可以随意增加', '另外chrome还自带了']
+  let from = 0
+  for (const text of order) {
+    const at = html.indexOf(text, from)
+    assert.ok(at > from || at === -1, `找不到 ${text}`)
+    from = at + 1
+  }
+})
+
+test('无序列表中嵌套有序列表：序号从 1 重新起算，start 序号保留', () => {
+  const source = `- 为啥推荐他呢, 原因有二:
+    1. 这次周刊准备用他做的一个工具来搞
+    2. 他那期介绍这个工具的视频
+       - b 站链接
+  - 第二个原因: 自动链接 https://example.com/x.mp4`
+
+  const html = stripPreviewMeta(renderMarkdown(source, themes[0], {}))
+  assert.doesNotMatch(html, /<ul|<ol|<li/)
+  // 有序列表从 1 起算；深度 2 的条目缩进 1.5em，深度 3 的缩进 3em
+  assert.match(html, />1\.&nbsp;<\/span>这次周刊/)
+  assert.match(html, />2\.&nbsp;<\/span>他那期/)
+  assert.match(html, />■&nbsp;<\/span>b 站链接/)
+
+  const start3 = stripPreviewMeta(renderMarkdown(`3. 第三项\n4. 第四项`, themes[0], {}))
+  assert.match(start3, />3\.&nbsp;<\/span>第三项/)
+  assert.match(start3, />4\.&nbsp;<\/span>第四项/)
+})
+
 test('三种多图模式都能生成稳定输出', () => {
   for (const mode of ['collage', 'grid', 'stack']) {
     const html = renderMarkdown(galleryMarkdown, themes[0], { galleryMode: mode })
@@ -61,6 +116,44 @@ test('网格模式的图全部为 1:1 正方形裁切，其他模式不受影响
     const html = renderMarkdown(galleryMarkdown, themes[0], { galleryMode: mode })
     assert.doesNotMatch(html, /aspect-ratio:1\/1/)
   }
+})
+
+test('外链转脚注：外链搬至文末参考资料带序号，微信内链保留可点击', () => {
+  const source = `链接的花样也不少：[普通链接](https://github.com/laogou717/md-wechat)、[带提示的链接](https://commonmark.org/ "Markdown 基础参考")、[参考式链接][style-guide]、自动链接 <https://commonmark.org/>、邮箱 <editor@example.com>，以及[微信内链](https://mp.weixin.qq.com/s/abcdefg)。另外**加粗链接**：[带格式的链接](https://example.com/a)。
+
+[style-guide]: https://commonmark.org/ "CommonMark 规范"`
+
+  const on = renderMarkdown(source, themes[0], { linkFootnotes: true, galleryMode: 'collage' })
+
+  // 外链不再输出 <a>；微信内链保留
+  assert.doesNotMatch(on, /<a href="https:\/\/github/)
+  assert.doesNotMatch(on, /<a href="https:\/\/commonmark/)
+  assert.doesNotMatch(on, /<a href="https:\/\/example\.com/)
+  assert.doesNotMatch(on, /mailto:/)
+  assert.match(on, /<a href="https:\/\/mp\.weixin\.qq\.com\/s\/abcdefg"/)
+
+  // 正文链接文字保留 + 角标，按出现顺序编号
+  assert.match(on, /普通链接<\/span><span style="[^"]*">\[1\]<\/span>/)
+  assert.match(on, /带提示的链接<\/span><span style="[^"]*">\[2\]<\/span>/)
+  assert.match(on, /参考式链接<\/span><span style="[^"]*">\[3\]<\/span>/)
+  assert.match(on, /https:\/\/commonmark\.org\/<\/span><span style="[^"]*">\[4\]<\/span>/)
+  assert.match(on, /editor@example\.com<\/span><span style="[^"]*">\[5\]<\/span>/)
+  assert.match(on, /带格式的链接<\/span><span style="[^"]*">\[6\]<\/span>/)
+
+  // 文末【参考资料】：文字：URL；自动链接与邮箱去重展示
+  assert.match(on, /参考资料/)
+  assert.match(on, /\[1\] 普通链接：https:\/\/github\.com\/laogou717\/md-wechat/)
+  assert.match(on, /\[2\] 带提示的链接：https:\/\/commonmark\.org\//)
+  assert.match(on, /\[3\] 参考式链接：https:\/\/commonmark\.org\//)
+  assert.match(on, /\[4\] https:\/\/commonmark\.org\//)
+  assert.match(on, /\[5\] editor@example\.com/)
+  assert.match(on, /\[6\] 带格式的链接：https:\/\/example\.com\/a/)
+  assert.doesNotMatch(on, /微信内链：https/)
+
+  // 关闭时行为不变：外链仍是真链接，无参考资料区
+  const off = renderMarkdown(source, themes[0], { galleryMode: 'collage' })
+  assert.match(off, /<a href="https:\/\/github/)
+  assert.doesNotMatch(off, /参考资料/)
 })
 
 test('拼贴焦点区右列两图按裁切填充渲染，左宽封顶 68%', () => {
@@ -122,7 +215,10 @@ test('保留列表起始序号、表格对齐和链接图片 title', () => {
     { galleryMode: 'collage' }
   )
 
-  assert.match(html, /<ol[^>]*start="3"/)
+  // 有序列表不走原生 <ol>（微信会扁平化），序号以文本形式保留
+  assert.doesNotMatch(html, /<ol|<ul|<li/)
+  assert.match(html, />3\.&nbsp;<\/span>第三项/)
+  assert.match(html, />4\.&nbsp;<\/span>第四项/)
   assert.match(html, /text-align:left/)
   assert.match(html, /text-align:center/)
   assert.match(html, /text-align:right/)
@@ -164,7 +260,7 @@ const ready = true
   assert.match(outputs[5], /TELEMETRY \/ JS/)
 })
 
-test('所有主题中的引用列表都保持正确层级与左对齐', () => {
+test('所有主题中的引用列表改用微信安全的 section 结构并保持左对齐', () => {
   const source = `> 外层引用
 >
 > > 内层引用
@@ -176,7 +272,8 @@ test('所有主题中的引用列表都保持正确层级与左对齐', () => {
     const html = renderMarkdown(source, theme, {})
 
     assert.equal((html.match(/<blockquote/g) || []).length, 2, theme.id)
-    assert.equal((html.match(/<li /g) || []).length, 2, theme.id)
+    // 微信粘贴会把嵌套 ul/ol/li 扁平化、顺序错乱，列表必须全部输出为 section
+    assert.doesNotMatch(html, /<ul|<ol|<li/, `${theme.id} 的列表不应输出原生列表标签`)
     assert.doesNotMatch(html, /<li[^>]*>\s*<p/, `${theme.id} 的紧凑列表不应生成额外段落`)
     assert.match(
       html,
@@ -185,13 +282,13 @@ test('所有主题中的引用列表都保持正确层级与左对齐', () => {
     )
     assert.match(
       html,
-      /<ul[^>]*style="[^"]*text-align:left[^"]*text-indent:0[^"]*"/,
+      /<section[^>]*style="[^"]*text-align:left[^"]*text-indent:0[^"]*"/,
       `${theme.id} 的引用列表必须左对齐`
     )
     assert.match(
       html,
-      /<li[^>]*style="[^"]*text-align:left[^"]*text-indent:0[^"]*"/,
-      `${theme.id} 的列表项必须左对齐`
+      />•&nbsp;<\/span>[^<]*引用列表一/,
+      `${theme.id} 的列表标记必须为纯文本`
     )
   }
 })

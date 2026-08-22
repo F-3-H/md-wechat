@@ -50,6 +50,29 @@
       </div>
 
       <div class="s-row">
+        <div class="s-label">外链处理</div>
+        <div class="s-seg">
+          <button
+            type="button"
+            :class="{ active: !store.settings.linkFootnotes }"
+            @click="store.settings.linkFootnotes = false"
+          >
+            保留链接
+          </button>
+          <button
+            type="button"
+            :class="{ active: store.settings.linkFootnotes }"
+            @click="store.settings.linkFootnotes = true"
+          >
+            转脚注
+          </button>
+        </div>
+        <div class="s-hint">
+          公众号不支持外链（粘贴后链接会失效）；「转脚注」把外部链接移到文末【参考资料】，微信内链（mp.weixin.qq.com）不受影响
+        </div>
+      </div>
+
+      <div class="s-row">
         <div class="s-label">图库模式</div>
         <div class="s-seg">
           <button

@@ -148,6 +148,35 @@ function escapeHtmlAttr(value) {
     .replace(/>/g, '&gt;')
 }
 
+// 从样式串里提取颜色（主题主色 / 正文色跟随主题与自定义，不写死）
+const colorOf = (styleCss, fallback) => (styleCss.match(/color:\s*([^;]+)/) || [])[1]?.trim() || fallback
+const accentColorOf = (styles) => colorOf(styles.a, '#3f3f46')
+const bodyColorOf = (styles) => colorOf(styles.container, '#3f3f46')
+
+// 外链脚注区（预览与复制共用）：文末【参考资料】，网址以纯文本形式可读可搜。
+// 公众号不支持外链，脚注是让链接信息不丢失的通用做法（mdnice 同款思路）。
+export function buildFootnoteSection(styles, footnotes) {
+  if (!footnotes?.length) return ''
+  const accent = accentColorOf(styles)
+  const body = bodyColorOf(styles)
+  const items = footnotes
+    .map((fn, i) => {
+      const label = (fn.text || '').trim()
+      const ref = fn.href.startsWith('mailto:') ? fn.href.slice(7) : fn.href
+      const line = label && label !== ref ? `[${i + 1}] ${label}：${ref}` : `[${i + 1}] ${ref}`
+      return `<p style="margin:0.3em 0;font-size:0.86em;color:${escapeHtmlAttr(
+        body
+      )};word-break:break-all;">${escapeHtmlAttr(line)}</p>`
+    })
+    .join('')
+  return (
+    `<section style="margin:2.2em 8px 0;padding-top:0.9em;border-top:1px solid #c8ccd0;">` +
+    `<p style="margin:0 0 0.55em;font-weight:700;color:${escapeHtmlAttr(accent)};">参考资料</p>` +
+    items +
+    `</section>`
+  )
+}
+
 // local: 图片引用解析（IndexedDB 图片库的 objectURL），由应用启动时注册。
 // 未注册或解析失败时回退为空 src，渲染表现为占位而非破图链接。
 let imageResolver = null
@@ -297,6 +326,7 @@ function createMd(theme, opts) {
   const macCode = !!opts.macCode
   const galleryMode = normalizeGalleryMode(opts.galleryMode)
   const galleryRatio = normalizeGalleryRatio(opts.galleryRatio).split(':').join('/')
+  const linkFootnotes = !!opts.linkFootnotes
   const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
   md.use(markdownItMark) // ==高亮标记==
   const esc = md.utils.escapeHtml
@@ -448,6 +478,97 @@ function createMd(theme, opts) {
       }
     })
   }
+
+  // ---- 微信安全列表：不用原生 <ul>/<ol>/<li> 嵌套 ----
+  // 微信公众号编辑器粘贴时会识别 ul/ol/li 并执行自己的“列表化”转换：
+  // 嵌套列表会被提升为顶层列表（list-paddingleft-1）、顺序倒挂、层级全部丢失，
+  // 发布后嵌套列表立刻错乱（3 层以上尤其明显）。
+  // 这里改用 section + 内联样式模拟列表：缩进按深度写成 padding-left、
+  // 标记符号 / 序号写成纯文本，微信只当普通块级元素保留，粘贴后与预览完全一致。
+  const LIST_INDENT = 1.5 // 每层缩进（em），与主题 ul/ol 的 padding-left 同宽
+  const BULLETS = ['•', '○', '■'] // 无序标记按深度循环，贴近原生 disc/circle/square
+  md.core.ruler.push('list_flat', (state) => {
+    const stack = [] // { ordered, start, index }
+    for (const token of state.tokens) {
+      if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') {
+        const ordered = token.type === 'ordered_list_open'
+        const start = ordered ? Number(token.attrGet('start') || 1) : 0
+        token.meta = { ...(token.meta || {}), listDepth: stack.length + 1 }
+        stack.push({ ordered, start, index: start })
+      } else if (token.type === 'list_item_open') {
+        const parent = stack[stack.length - 1]
+        const depth = stack.length
+        token.meta = {
+          ...(token.meta || {}),
+          listDepth: depth,
+          ordered: !!parent?.ordered,
+          number: parent?.ordered ? parent.index : 0,
+          bullet: BULLETS[(Math.max(depth, 1) - 1) % BULLETS.length],
+        }
+        if (parent?.ordered) parent.index += 1
+      } else if (token.type === 'bullet_list_close' || token.type === 'ordered_list_close') {
+        token.meta = { ...(token.meta || {}), listDepth: stack.length }
+        stack.pop()
+      }
+    }
+  })
+
+  // ---- 微信外链转脚注 ----
+  // 公众号只支持 mp.weixin.qq.com 域名的可点击链接，其余外链在粘贴时会被
+  // 微信编辑器直接剥离（只剩文字，网址也丢失），保存时还可能提示
+  //「请勿插入非mp/weixin.qq.com的域名链接」。开启后把外链搬到文末
+  //【参考资料】，以脚注 [n] 形式保留网址；正文只留链接文字 + 角标，
+  // 微信内链（mp.weixin.qq.com）不受影响、保持可点击。
+  const isWeixinInternal = (href) => /^https?:\/\/mp\.weixin\.qq\.com(?:\/|$)/i.test(href)
+  md.core.ruler.push('link_footnote', (state) => {
+    if (!linkFootnotes) return
+    const footnotes = state.env.footnotes || (state.env.footnotes = [])
+    for (const token of state.tokens) {
+      if (token.type !== 'inline' || !token.children?.length) continue
+      const next = []
+      let open = null // 正在转脚注的外链：{ href, text }
+      for (const ch of token.children) {
+        if (ch.type === 'link_open') {
+          const href = ch.attrGet('href') || ''
+          if (isWeixinInternal(href)) {
+            next.push(ch)
+            continue
+          }
+          open = { href, text: '' }
+          // 链接外壳换成 span：保留链接的视觉样式，但不再是 <a>（微信会剥掉）
+          ch.type = 'span_open'
+          ch.tag = 'span'
+          ch.nesting = 1
+          ch.attrs = [['style', styles.a]]
+          next.push(ch)
+          continue
+        }
+        if (ch.type === 'link_close' && open) {
+          const n = footnotes.length + 1
+          ch.type = 'span_close'
+          ch.tag = 'span'
+          ch.nesting = -1
+          ch.attrs = []
+          next.push(ch)
+          // 链接文字后的脚注角标（html_inline 由渲染器原样输出）
+          const mark = new state.Token('html_inline', '', 0)
+          mark.content = `<span style="${escapeHtmlAttr(
+            `font-size:0.72em;vertical-align:super;color:${accentColorOf(styles)};margin-left:0.25em;`
+          )}">[${n}]</span>`
+          next.push(mark)
+          footnotes.push(open)
+          open = null
+          continue
+        }
+        if (open) {
+          // 收集链接文字（用于脚注条目展示）
+          if (ch.type === 'text' || ch.type === 'code_inline' || ch.type === 'image') open.text += ch.content
+        }
+        next.push(ch)
+      }
+      token.children = next
+    }
+  })
 
   // 为段落记录真实的块级祖先。不能靠“向前找到最近的 open token”猜测，
   // 因为子列表 / 子引用关闭后，段落仍可能属于外层列表项或引用。
@@ -708,14 +829,28 @@ function createMd(theme, opts) {
       tokens[idx].meta?.blockquoteDepth > 0 ? styles.blockquoteNested : styles.blockquote
     return `<blockquote${dl(tokens[idx])} style="${escapeHtmlAttr(style)}">`
   }
-  md.renderer.rules.bullet_list_open = (tokens, idx) =>
-    `<ul${dl(tokens[idx])} style="${escapeHtmlAttr(styles.ul)}">`
-  md.renderer.rules.ordered_list_open = (tokens, idx) => {
-    const start = tokens[idx].attrGet('start')
-    const startAttr = start ? ` start="${escapeHtmlAttr(start)}"` : ''
-    return `<ol${dl(tokens[idx])}${startAttr} style="${escapeHtmlAttr(styles.ol)}">`
+  // ---- 列表（微信安全版）：全部输出为 section，绝不输出原生 ul/ol/li ----
+  // 只有第一层列表输出容器 section（带主题的 ul/ol 样式，包含整体缩进与纵向边距）；
+  // 嵌套层不输出容器，靠条目自身的 padding-left 逐层加深，微信无从“扁平化”。
+  const listContainerOpen = (token, style) => {
+    if ((token.meta?.listDepth || 1) > 1) return ''
+    return `<section${dl(token)} style="${escapeHtmlAttr(style)}">`
   }
-  md.renderer.rules.list_item_open = () => `<li style="${escapeHtmlAttr(styles.li)}">`
+  const listContainerClose = (token) => ((token.meta?.listDepth || 1) > 1 ? '' : '</section>')
+  md.renderer.rules.bullet_list_open = (tokens, idx) => listContainerOpen(tokens[idx], styles.ul)
+  md.renderer.rules.bullet_list_close = (tokens, idx) => listContainerClose(tokens[idx])
+  md.renderer.rules.ordered_list_open = (tokens, idx) => listContainerOpen(tokens[idx], styles.ol)
+  md.renderer.rules.ordered_list_close = (tokens, idx) => listContainerClose(tokens[idx])
+  md.renderer.rules.list_item_open = (tokens, idx) => {
+    const t = tokens[idx]
+    const depth = t.meta?.listDepth || 1
+    const indent = depth > 1 ? `padding-left:${(depth - 1) * LIST_INDENT}em;` : ''
+    const marker = t.meta?.ordered
+      ? `<span style="text-indent:0;">${t.meta.number}.&nbsp;</span>`
+      : `<span style="text-indent:0;">${t.meta?.bullet || '•'}&nbsp;</span>`
+    return `<section style="${escapeHtmlAttr(`${styles.li}${indent}`)}">${marker}`
+  }
+  md.renderer.rules.list_item_close = () => '</section>'
   md.renderer.rules.strong_open = () => `<strong style="${escapeHtmlAttr(styles.strong)}">`
   md.renderer.rules.mark_open = () => `<mark style="${escapeHtmlAttr(styles.mark)}">`
   if (styles.em) md.renderer.rules.em_open = () => `<em style="${escapeHtmlAttr(styles.em)}">`
@@ -807,6 +942,7 @@ export function renderMarkdown(src, theme, opts = {}) {
     opts.macCode ? 1 : 0,
     normalizeGalleryMode(opts.galleryMode),
     normalizeGalleryRatio(opts.galleryRatio),
+    opts.linkFootnotes ? 1 : 0,
     JSON.stringify(opts.custom || {}),
   ].join('|')
   let entry = cache.get(key)
@@ -820,7 +956,12 @@ export function renderMarkdown(src, theme, opts = {}) {
     if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value)
   }
   lastThemeStyles = entry.styles
-  return `<section style="${escapeHtmlAttr(entry.styles.container)}">${entry.md.render(src)}</section>`
+  const env = {}
+  const body = entry.md.render(src, env)
+  return `<section style="${escapeHtmlAttr(entry.styles.container)}">${body}${buildFootnoteSection(
+    entry.styles,
+    env.footnotes
+  )}</section>`
 }
 
 // 复制前剥离预览专用标记（行号、画廊模式标记等对文章无意义）

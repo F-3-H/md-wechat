@@ -100,6 +100,30 @@ test('无序列表中嵌套有序列表：序号从 1 重新起算，start 序�
   assert.match(start3, />4\.&nbsp;<\/span>第四项/)
 })
 
+test('引用块装饰 bqWrapOpen/bqWrapClose 只出现在第一层，嵌套引用不重复', () => {
+  const decorated = {
+    ...themes[0],
+    id: 'decorated-quote',
+    styles: (p, fs, font) => ({
+      ...themes[0].styles(p, fs, font),
+      bqWrapOpen: `<span style="display:block;color:${p};">❝</span>`,
+      bqWrapClose: `<span style="display:block;text-align:right;color:${p};">❞</span>`,
+    }),
+  }
+  const nested = stripPreviewMeta(renderMarkdown('> 外层引用\n>\n> > 嵌套引用', decorated, {}))
+  assert.equal((nested.match(/❝/g) || []).length, 1, '首层引用开头装饰恰好一次')
+  assert.equal((nested.match(/❞/g) || []).length, 1, '首层引用结尾装饰恰好一次')
+  assert.match(nested, /❞<\/span><\/blockquote>/, '结尾装饰紧贴外层引用闭合')
+
+  const pair = stripPreviewMeta(renderMarkdown('> 引用一\n\n随后正文\n\n> 引用二', decorated, {}))
+  assert.equal((pair.match(/❝/g) || []).length, 2, '每个引用卡开头一个 ❝')
+  assert.equal((pair.match(/❞/g) || []).length, 2, '每个引用卡结尾一个 ❞')
+
+  // 未配置装饰的主题不受影响
+  const plain = stripPreviewMeta(renderMarkdown('> 普通引用', themes[0], {}))
+  assert.doesNotMatch(plain, /❝|❞/)
+})
+
 test('三种多图模式都能生成稳定输出', () => {
   for (const mode of ['collage', 'grid', 'stack']) {
     const html = renderMarkdown(galleryMarkdown, themes[0], { galleryMode: mode })

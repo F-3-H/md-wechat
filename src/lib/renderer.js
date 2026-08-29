@@ -486,7 +486,7 @@ function createMd(theme, opts) {
   // 这里改用 section + 内联样式模拟列表：缩进按深度写成 padding-left、
   // 标记符号 / 序号写成纯文本，微信只当普通块级元素保留，粘贴后与预览完全一致。
   const LIST_INDENT = 1.5 // 每层缩进（em），与主题 ul/ol 的 padding-left 同宽
-  const BULLETS = ['•', '○', '■'] // 无序标记按深度循环，贴近原生 disc/circle/square
+  const BULLETS = ['•', '◦', '▪'] // 无序标记按深度循环，取与原生 disc/circle/square 等大的小号字形
   md.core.ruler.push('list_flat', (state) => {
     const stack = [] // { ordered, start, index }
     for (const token of state.tokens) {

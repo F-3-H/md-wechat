@@ -67,9 +67,9 @@ test('三层以上嵌套列表输出微信安全的 section 结构，层级与�
   assert.equal(depth2, 4, '应有 4 个第二层条目') // 效果就是 / 实现这个效果很简单: / 用这个方式... / 打开...(3层)
   assert.equal(depth3, 4, '应有 4 个第三层条目') // 打开 / 在Site search / shortcut=em / 另外chrome
 
-  // 标记符号按深度区分：1 层 •、2 层 ○、3 层 ■
-  const bulletSeq = [...html.matchAll(/>([•○■])&nbsp;<\/span>/g)].map((m) => m[1])
-  assert.deepEqual(bulletSeq, ['•', '○', '○', '■', '■', '■', '○', '■'])
+  // 标记符号按深度区分：1 层 •、2 层 ◦、3 层 ▪
+  const bulletSeq = [...html.matchAll(/>([•◦▪])&nbsp;<\/span>/g)].map((m) => m[1])
+  assert.deepEqual(bulletSeq, ['•', '◦', '◦', '▪', '▪', '▪', '◦', '▪'])
 
   // 顺序与源码一致（扁平化是微信行为，我们输出的 DOM 顺序必须忠于原文）
   const order = ['chrome tip', '效果就是在chrome搜索栏输入', '实现这个效果很简单', 'chrome://settings/searchEngines', 'Site search', 'shortcut=em', '用这个方式可以随意增加', '另外chrome还自带了']
@@ -93,7 +93,7 @@ test('无序列表中嵌套有序列表：序号从 1 重新起算，start 序�
   // 有序列表从 1 起算；深度 2 的条目缩进 1.5em，深度 3 的缩进 3em
   assert.match(html, />1\.&nbsp;<\/span>这次周刊/)
   assert.match(html, />2\.&nbsp;<\/span>他那期/)
-  assert.match(html, />■&nbsp;<\/span>b 站链接/)
+  assert.match(html, />▪&nbsp;<\/span>b 站链接/)
 
   const start3 = stripPreviewMeta(renderMarkdown(`3. 第三项\n4. 第四项`, themes[0], {}))
   assert.match(start3, />3\.&nbsp;<\/span>第三项/)

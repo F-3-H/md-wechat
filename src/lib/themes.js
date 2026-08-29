@@ -1050,6 +1050,76 @@ export const themes = [
       td: `border:1px solid #ffc2da;padding:8px 12px;`,
     }),
   },
+  {
+    id: 'tech-blue',
+    name: '科技蓝',
+    tag: '技术 · 教程',
+    description: '移植自 mdnice 经典「科技蓝」：蓝色竖条标题、灰青投影卡片引用与渐变分隔线。',
+    primary: '#0e88eb',
+    font: 'sans',
+    mock: 'band',
+    surface: '#ffffff',
+    previewFade: '#ffffff',
+    styles: (p) => ({
+      // 主色贯穿标题 / 强调 / 引用；引用与图片统一灰青大投影（#84a1a8）；
+      // 代码块沿用默认 Mac 深色窗口（mdnice 上与科技蓝的经典搭配）
+      h1: `font-size:1.5em;font-weight:700;text-align:center;color:${p};margin:1.6em 8px 0.9em;padding-bottom:0.3em;border-bottom:2px solid ${p};line-height:1.5;`,
+      h2: `font-size:1.3em;font-weight:700;color:${p};margin:1.8em 8px 0.9em;padding-left:0.5em;border-left:5px solid ${p};line-height:1.5;`,
+      h3: `font-size:1.1em;font-weight:700;color:${p};margin:1.6em 8px 0.7em;line-height:1.5;`,
+      h4: `font-size:1em;font-weight:700;color:${p};margin:1.4em 8px 0.6em;line-height:1.5;`,
+      blockquote: `margin:1.8em 8px 2.2em;padding:0.8em 1.1em 0.9em;background-color:#ffffff;border-radius:0 0 10px 10px;box-shadow:0 10px 15px #84a1a8;color:${p};font-size:0.94em;line-height:1.8;`,
+      bqWrapOpen: `<span style="display:block;font-size:1.9em;line-height:1.1;font-weight:700;color:${p};">❝</span>`,
+      bqP: `margin:0;`,
+      strong: `font-weight:700;color:${p};`,
+      em: `font-style:italic;color:${p};`,
+      a: `color:${p};font-weight:600;text-decoration:none;`,
+      img: `display:block;max-width:100%;margin:1.4em auto 2.2em;border-radius:0 0 5px 5px;box-shadow:0 10px 15px #84a1a8;`,
+      caption: `display:block;text-align:center;font-size:0.76em;color:#a1a1aa;margin:-1.4em 0 1.4em;letter-spacing:0.04em;`,
+      hr: `border:none;height:1px;background-color:${p};background-image:linear-gradient(to right,rgba(14,136,235,0),${p},rgba(14,136,235,0));margin:2.2em 16px;`,
+      code: `font-family:Menlo,Consolas,'Courier New',monospace;font-size:0.86em;background-color:rgba(27,31,35,0.05);color:${p};padding:2px 6px;border-radius:4px;`,
+      th: `border:1px solid #e4e4e7;padding:8px 12px;background-color:${p}14;color:${p};font-weight:700;text-align:left;`,
+      td: `border:1px solid #e4e4e7;padding:8px 12px;`,
+    }),
+  },
+  {
+    id: 'fullstack-blue',
+    name: '全栈蓝',
+    tag: '全栈 · 笔记',
+    description: '移植自 mdnice 经典「全栈蓝」：网格稿纸底、蓝条标题与浅蓝边框引用卡。',
+    primary: '#40b8fa',
+    font: 'sans',
+    mock: 'band',
+    surface: '#ffffff',
+    previewFade: '#ffffff',
+    styles: (p, fs, font) => ({
+      // 三档蓝：主色 #40b8fa / 强调 #3594f7 / 线条 #3baafa；透明度变体用 8 位
+      // hex 写成主色前缀，强调色联动时正则替换连同透明度一起换算。
+      // 原版 h2/h3 图标与 strong 的「」缀饰依赖伪元素和外链图，以内联形式适配。
+      container: `font-family:${font};font-size:${fs}px;line-height:1.8;color:#2b2b2b;letter-spacing:0.05em;padding:0 8px;background-image:repeating-linear-gradient(0deg,rgba(50,0,0,0.04) 0,rgba(50,0,0,0.04) 1px,transparent 1px,transparent 20px),repeating-linear-gradient(90deg,rgba(50,0,0,0.04) 0,rgba(50,0,0,0.04) 1px,transparent 1px,transparent 20px);`,
+      h1: `font-size:1.55em;font-weight:700;text-align:center;color:${p};margin:1.5em 8px 0.9em;line-height:1.5;letter-spacing:0.05em;`,
+      h2WrapOpen: `<span style="display:inline-block;width:0.8em;height:0.8em;line-height:0.8em;font-size:0.8em;background-color:${p}80;border-radius:0.2em;margin-right:0.5em;overflow:hidden;">&nbsp;</span>`,
+      h2: `font-size:1.25em;font-weight:700;color:${p};margin:1.8em 8px 1em;padding-bottom:0.3em;border-bottom:4px solid ${p};line-height:1.5;`,
+      h3: `font-size:1.06em;font-weight:700;text-align:center;color:#2b2b2b;margin:1.7em 8px 0.8em;line-height:1.7;`,
+      h3WrapOpen: `<span style="border-bottom:2px solid ${p}a6;padding-bottom:3px;">`,
+      h3WrapClose: `</span>`,
+      h4: `font-size:1em;font-weight:700;color:#2b2b2b;margin:1.4em 8px 0.6em;line-height:1.5;`,
+      li: `margin:0.4em 0;color:#595959;`,
+      blockquote: `margin:1.6em 8px;padding:0.7em 1em 0.8em;background-color:${p}1a;border:1px solid ${p}66;border-radius:6px;color:#595959;font-size:0.94em;line-height:1.7;`,
+      bqWrapOpen: `<span style="display:block;font-size:1.9em;line-height:1.1;font-weight:700;color:${p}80;">❝</span>`,
+      bqWrapClose: `<span style="display:block;font-size:1.4em;line-height:1;font-weight:700;color:${p}80;text-align:right;">❞</span>`,
+      bqP: `margin:0;`,
+      strong: `font-weight:700;color:#3594f7;`,
+      em: `font-style:normal;font-weight:700;color:#3594f7;`,
+      s: `color:#3594f7;text-decoration-thickness:1px;`,
+      a: `color:${p};text-decoration:none;border-bottom:1px solid #3baafa;`,
+      img: `display:block;max-width:100%;margin:1.3em auto;border-radius:6px;box-shadow:2px 4px 7px rgba(0,0,0,0.35);`,
+      caption: `display:block;text-align:center;font-size:0.8em;color:#2b2b2b;margin:-0.5em 0 1.2em;`,
+      hr: `border:none;border-top:2px solid #3baafa;margin:2em 16px;`,
+      code: `font-family:Menlo,Consolas,'Courier New',monospace;font-size:0.86em;background-color:#3baafa1a;color:#3594f7;padding:1px 4px;border-radius:2px;`,
+      th: `border:1px solid ${p}66;padding:8px 12px;background-color:${p}1f;color:#2b2b2b;font-weight:700;text-align:left;`,
+      td: `border:1px solid ${p}40;padding:8px 12px;color:#595959;`,
+    }),
+  },
 ]
 
 // ---------- 强调色联动 ----------
@@ -1069,6 +1139,8 @@ const ACCENT_TINTS = {
   latte: { '#d9c3ac': 0.6, '#f0e7db': 0.9, '#f0e2cd': 0.85, '#e8ddcf': 0.75, '#e0d5c5': 0.7, '#8a7360': 0.3, '#4a3626': 'deep' },
   'cyan-scape': { '#5fa092': 0.3, '#7fb5a2': 0.5, '#eef4f1': 0.93, '#d4e7df': 0.8, '#cfe0d8': 0.75, '#5a7269': 0.25 },
   'candy-pop': { '#ffc2da': 0.75 },
+  // 强调蓝 / 线条蓝与主色同族，联动时直接跟随用户所选主色
+  'fullstack-blue': { '#3594f7': 0, '#3baafa': 0 },
 }
 
 // 灰黑系主题的正文/标题就是主色本身，全局替换会毁掉正文可读性，故关闭联动
@@ -1097,6 +1169,7 @@ export const COLOR_SLOTS = {
     { key: 'blue', label: '点缀蓝', base: '#4d7cff', tints: { '#f4f8ff': 0.94 } },
     { key: 'yellow', label: '点缀黄', base: '#ffd23f' },
   ],
+  'tech-blue': [{ key: 'shadow', label: '投影灰青', base: '#84a1a8' }],
 }
 
 function mixHex(hexA, hexB, ratio) {
@@ -1197,6 +1270,8 @@ export const themeCategories = {
   latte: '活力',
   'cyan-scape': '书卷',
   'candy-pop': '活力',
+  'tech-blue': '科技',
+  'fullstack-blue': '科技',
 }
 
 export const categoryOrder = ['全部', '收藏', '简约', '书卷', '杂志', '商务', '科技', '活力']

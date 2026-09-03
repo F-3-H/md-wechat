@@ -67,9 +67,9 @@ test('三层以上嵌套列表输出微信安全的 section 结构，层级与�
   assert.equal(depth2, 4, '应有 4 个第二层条目') // 效果就是 / 实现这个效果很简单: / 用这个方式... / 打开...(3层)
   assert.equal(depth3, 4, '应有 4 个第三层条目') // 打开 / 在Site search / shortcut=em / 另外chrome
 
-  // 标记符号按深度区分：1 层 •、2 层 ○、3 层 ■
-  const bulletSeq = [...html.matchAll(/>([•○■])&nbsp;<\/span>/g)].map((m) => m[1])
-  assert.deepEqual(bulletSeq, ['•', '○', '○', '■', '■', '■', '○', '■'])
+  // 标记符号按深度区分：1 层 •、2 层 ◦、3 层 ▪
+  const bulletSeq = [...html.matchAll(/>([•◦▪])&nbsp;<\/span>/g)].map((m) => m[1])
+  assert.deepEqual(bulletSeq, ['•', '◦', '◦', '▪', '▪', '▪', '◦', '▪'])
 
   // 顺序与源码一致（扁平化是微信行为，我们输出的 DOM 顺序必须忠于原文）
   const order = ['chrome tip', '效果就是在chrome搜索栏输入', '实现这个效果很简单', 'chrome://settings/searchEngines', 'Site search', 'shortcut=em', '用这个方式可以随意增加', '另外chrome还自带了']
@@ -93,11 +93,35 @@ test('无序列表中嵌套有序列表：序号从 1 重新起算，start 序�
   // 有序列表从 1 起算；深度 2 的条目缩进 1.5em，深度 3 的缩进 3em
   assert.match(html, />1\.&nbsp;<\/span>这次周刊/)
   assert.match(html, />2\.&nbsp;<\/span>他那期/)
-  assert.match(html, />■&nbsp;<\/span>b 站链接/)
+  assert.match(html, />▪&nbsp;<\/span>b 站链接/)
 
   const start3 = stripPreviewMeta(renderMarkdown(`3. 第三项\n4. 第四项`, themes[0], {}))
   assert.match(start3, />3\.&nbsp;<\/span>第三项/)
   assert.match(start3, />4\.&nbsp;<\/span>第四项/)
+})
+
+test('引用块装饰 bqWrapOpen/bqWrapClose 只出现在第一层，嵌套引用不重复', () => {
+  const decorated = {
+    ...themes[0],
+    id: 'decorated-quote',
+    styles: (p, fs, font) => ({
+      ...themes[0].styles(p, fs, font),
+      bqWrapOpen: `<span style="display:block;color:${p};">❝</span>`,
+      bqWrapClose: `<span style="display:block;text-align:right;color:${p};">❞</span>`,
+    }),
+  }
+  const nested = stripPreviewMeta(renderMarkdown('> 外层引用\n>\n> > 嵌套引用', decorated, {}))
+  assert.equal((nested.match(/❝/g) || []).length, 1, '首层引用开头装饰恰好一次')
+  assert.equal((nested.match(/❞/g) || []).length, 1, '首层引用结尾装饰恰好一次')
+  assert.match(nested, /❞<\/span><\/blockquote>/, '结尾装饰紧贴外层引用闭合')
+
+  const pair = stripPreviewMeta(renderMarkdown('> 引用一\n\n随后正文\n\n> 引用二', decorated, {}))
+  assert.equal((pair.match(/❝/g) || []).length, 2, '每个引用卡开头一个 ❝')
+  assert.equal((pair.match(/❞/g) || []).length, 2, '每个引用卡结尾一个 ❞')
+
+  // 未配置装饰的主题不受影响
+  const plain = stripPreviewMeta(renderMarkdown('> 普通引用', themes[0], {}))
+  assert.doesNotMatch(plain, /❝|❞/)
 })
 
 test('三种多图模式都能生成稳定输出', () => {

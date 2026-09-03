@@ -486,7 +486,7 @@ function createMd(theme, opts) {
   // 这里改用 section + 内联样式模拟列表：缩进按深度写成 padding-left、
   // 标记符号 / 序号写成纯文本，微信只当普通块级元素保留，粘贴后与预览完全一致。
   const LIST_INDENT = 1.5 // 每层缩进（em），与主题 ul/ol 的 padding-left 同宽
-  const BULLETS = ['•', '○', '■'] // 无序标记按深度循环，贴近原生 disc/circle/square
+  const BULLETS = ['•', '◦', '▪'] // 无序标记按深度循环，取与原生 disc/circle/square 等大的小号字形
   md.core.ruler.push('list_flat', (state) => {
     const stack = [] // { ordered, start, index }
     for (const token of state.tokens) {
@@ -593,7 +593,8 @@ function createMd(theme, opts) {
         }
       }
 
-      if (token.type === 'blockquote_open') {
+      if (token.type === 'blockquote_open' || token.type === 'blockquote_close') {
+        // close 在本循环开头已弹出自身的 open，两者算出的都是“所在嵌套深度”
         token.meta = {
           ...(token.meta || {}),
           blockquoteDepth: stack.filter((type) => type === 'blockquote_open').length,
@@ -824,10 +825,17 @@ function createMd(theme, opts) {
     return `${wrap}</h${level}>`
   }
 
+  // 引用块装饰（bqWrapOpen/bqWrapClose）：主题可在引用卡首尾注入装饰 HTML
+  // （如 ❝ / ❞ 引号），仅第一层引用生效——嵌套引用已降阶为细左边线，不重复装饰。
   md.renderer.rules.blockquote_open = (tokens, idx) => {
-    const style =
-      tokens[idx].meta?.blockquoteDepth > 0 ? styles.blockquoteNested : styles.blockquote
-    return `<blockquote${dl(tokens[idx])} style="${escapeHtmlAttr(style)}">`
+    const nested = tokens[idx].meta?.blockquoteDepth > 0
+    const style = nested ? styles.blockquoteNested : styles.blockquote
+    const deco = !nested && styles.bqWrapOpen ? styles.bqWrapOpen : ''
+    return `<blockquote${dl(tokens[idx])} style="${escapeHtmlAttr(style)}">${deco}`
+  }
+  md.renderer.rules.blockquote_close = (tokens, idx) => {
+    const nested = tokens[idx].meta?.blockquoteDepth > 0
+    return `${!nested && styles.bqWrapClose ? styles.bqWrapClose : ''}</blockquote>`
   }
   // ---- 列表（微信安全版）：全部输出为 section，绝不输出原生 ul/ol/li ----
   // 只有第一层列表输出容器 section（带主题的 ul/ol 样式，包含整体缩进与纵向边距）；

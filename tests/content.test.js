@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { samples, sample } from '../src/lib/sample.js'
 import { themes } from '../src/lib/themes.js'
 
-test('主题库保留 26 套完整主题，且标识与样式均唯一', () => {
-  assert.equal(themes.length, 26)
+test('主题库保留 28 套完整主题，且标识与样式均唯一', () => {
+  assert.equal(themes.length, 28)
   assert.equal(themes[0].id, 'literary')
   assert.deepEqual(
     themes.map((item) => item.id),
@@ -35,6 +35,8 @@ test('主题库保留 26 套完整主题，且标识与样式均唯一', () => {
       'latte',
       'cyan-scape',
       'candy-pop',
+      'tech-blue',
+      'fullstack-blue',
     ]
   )
   assert.equal(new Set(themes.map((item) => item.id)).size, themes.length)

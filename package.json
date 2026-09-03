@@ -2,7 +2,7 @@
   "name": "md-wechat",
   "private": true,
   "version": "0.1.0",
-  "description": "面向公众号写作者的 Markdown 排版工具：实时预览、26 套主题、一键复制富文本",
+  "description": "面向公众号写作者的 Markdown 排版工具：实时预览、28 套主题、一键复制富文本",
   "license": "MIT",
   "type": "module",
   "scripts": {

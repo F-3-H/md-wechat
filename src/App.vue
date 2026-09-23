@@ -139,6 +139,7 @@ import { themes } from './lib/themes.js'
 import { renderMarkdown, stripPreviewMeta, copyVideoPlaceholder } from './lib/renderer.js'
 import { copyRichText, copyText } from './lib/clipboard.js'
 import { getImage, blobToDataUrl, getCachedImageEntries } from './lib/imagedb.js'
+import { onMathReady, ensureMathLoaded } from './lib/mathjax.js'
 import { sample, samples } from './lib/sample.js'
 
 const editorRef = ref(null)
@@ -147,6 +148,12 @@ const mainRef = ref(null)
 const previewStage = ref(null)
 const previewViewport = ref(null)
 const previewScale = ref(1)
+
+// MathJax（公式）是异步加载的：加载完成后自增此值，触发整篇重渲染把占位符换成真正的公式
+const mathVersion = ref(0)
+onMathReady(() => {
+  mathVersion.value += 1
+})
 
 function openDocuments() {
   store.ui.documentView = 'documents'
@@ -188,6 +195,7 @@ function switchDevice(value) {
 const html = computed(() => {
   store.imageCacheVersion // 图片缓存预热完成后触发重渲染
   store.aspectVersion // 图片比例学习到新值后重渲染（对齐式画廊）
+  mathVersion.value // MathJax 就绪后重渲染，把公式占位换成 SVG
   return renderMarkdown(store.md, renderTheme.value, {
     ...store.settings,
     accent: store.settings.accentByTheme?.[renderTheme.value.id] || null,
@@ -689,13 +697,17 @@ async function replaceLargeVideos(htmlText) {
 }
 
 async function doCopy() {
+  // 文档里有公式时先等 MathJax 就绪，免得把占位符复制走；加载失败则如实告知
+  const mathOk = await ensureMathLoaded()
   await collectImageAspects()
   await nextTick()
   // 先剥离预览标记、按大小处理视频，再内联 blob 图片（避免处理巨型 base64 字符串）
   let htmlText = stripPreviewMeta(html.value)
   htmlText = await replaceLargeVideos(htmlText)
   const ok = await copyRichText(await inlineLocalImages(htmlText))
-  notify(ok ? '排版已复制，可以去公众号后台粘贴了' : '复制失败，请手动全选预览内容')
+  if (!ok) notify('复制失败，请手动全选预览内容')
+  else if (mathOk) notify('排版已复制，可以去公众号后台粘贴了')
+  else notify('排版已复制；公式引擎未加载成功，公式按原文保留')
 }
 
 // 把 HTML 里图片、小视频的 blob: 链接统一还原成 data URI
@@ -711,6 +723,7 @@ async function inlineLocalImages(htmlText) {
 }
 
 async function copySource() {
+  await ensureMathLoaded()
   let htmlText = stripPreviewMeta(html.value)
   htmlText = await replaceLargeVideos(htmlText)
   const ok = await copyText(await inlineLocalImages(htmlText))

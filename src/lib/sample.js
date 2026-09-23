@@ -129,7 +129,28 @@ const introArticle = `# 公众号太久没更新，我顺手写了个排版工�
 | 排版（分钟） | 18 | 12 | 6 | 6 | 5 |
 | 修改（次） | 4 | 3 | 2 | 1 | 1 |
 
-## 08 代码
+## 08 数学公式
+
+行内公式混在句子里也不会破坏行距，比如质能方程 $E = mc^2$、求根公式 $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$，以及写成 \\(a^2+b^2=c^2\\) 的 LaTeX 行内式。
+
+独立成段的公式会居中显示，宽度自动跟随正文字号：
+
+$$
+\int_{-\infty}^{+\infty} e^{-x^2}\,\mathrm{d}x = \sqrt{\pi}
+$$
+
+多行对齐用 align 环境；公式过宽时会等比缩小，不会把版面撑破：
+
+$$
+\begin{align}
+\nabla \cdot \mathbf{E} &= \frac{\rho}{\varepsilon_0} \\
+\nabla \times \mathbf{B} &= \mu_0\mathbf{J} + \mu_0\varepsilon_0\frac{\partial \mathbf{E}}{\partial t}
+\end{align}
+$$
+
+公式输出的是矢量 SVG，复制进公众号后依然清晰、颜色跟随主题正文（深色主题下自动变浅）。识别规则很保守：单价 $100、总计 $1,000.00 这类金额不会被误当成公式。
+
+## 09 代码
 
 行内代码就是 \`这样的\`，代码块的样式同样跟随主题：
 
@@ -149,7 +170,7 @@ def publish(article):
     return render(article, theme)
 \`\`\`
 
-## 09 视频
+## 10 视频
 
 直接把视频文件粘贴进编辑器就行：本地可以播放预览，复制时自动内联带走。
 

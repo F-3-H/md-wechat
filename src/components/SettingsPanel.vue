@@ -73,6 +73,29 @@
       </div>
 
       <div class="s-row">
+        <div class="s-label">数学公式</div>
+        <div class="s-seg">
+          <button
+            type="button"
+            :class="{ active: store.settings.math !== false }"
+            @click="store.settings.math = true"
+          >
+            渲染
+          </button>
+          <button
+            type="button"
+            :class="{ active: store.settings.math === false }"
+            @click="store.settings.math = false"
+          >
+            保留原文
+          </button>
+        </div>
+        <div class="s-hint">
+          支持 $…$、$$…$$、\(…\)、\[…\] 四种写法。公式渲染为矢量 SVG（不依赖字体与外部样式），复制到公众号后仍是清晰的公式；识别很保守，「$100」这类金额不会被当成公式
+        </div>
+      </div>
+
+      <div class="s-row">
         <div class="s-label">图库模式</div>
         <div class="s-seg">
           <button

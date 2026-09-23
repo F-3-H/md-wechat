@@ -6,6 +6,10 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "sync:mathjax": "node scripts/sync-mathjax.mjs",
+    "postinstall": "node scripts/sync-mathjax.mjs",
+    "predev": "node scripts/sync-mathjax.mjs",
+    "prebuild": "node scripts/sync-mathjax.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -19,6 +23,7 @@
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0",
     "markdown-it-mark": "^4.0.0",
+    "mathjax": "^3.2.2",
     "vue": "^3.5.13"
   },
   "devDependencies": {

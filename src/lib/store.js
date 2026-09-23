@@ -85,6 +85,7 @@ function loadSettings() {
     galleryMode: 'collage',
     galleryRatio: '1:1',
     linkFootnotes: false,
+    math: true,
     favoriteThemes: [],
     custom: {},
     imageHost: { provider: '', config: {}, always: 'off' },

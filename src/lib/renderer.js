@@ -53,6 +53,7 @@ const LANGUAGES = {
 for (const [name, register] of Object.entries(LANGUAGES)) hljs.registerLanguage(name, register)
 
 import { buildStyles } from './themes.js'
+import { renderMath } from './mathjax.js'
 
 // highlight.js 类名 -> 内联样式，深浅两套配色（公众号会剥离 <style>，高亮必须内联）。
 const HLJS_DARK = {
@@ -338,6 +339,124 @@ function createMd(theme, opts) {
     const t = tokens[idx]
     if (t.map && t.nesting === 1 && !t.attrGet('data-line')) t.attrSet('data-line', String(t.map[0]))
     return defaultRenderToken(tokens, idx, options)
+  }
+
+  // ---- 数学公式：$…$ / $$…$$ / \(…\) / \[…\] ----
+  // 公众号只认内联样式，所以公式输出的是 MathJax 的 SVG（纯 <path>、跟随 currentColor），
+  // 详见 mathjax.js 顶部说明。识别规则有两道闸：内容必须含"数学特征字符"，且不允许跨行。
+  const MATH_SIGNAL = /[A-Za-z\\^_{}=+\-*/<>()[\]|]|[\u0370-\u03ff\u2100-\u22ff]/
+  const mathEnabled = opts.math !== false
+  const mathTex = (raw) => {
+    const tex = raw.trim()
+    if (!tex) return null
+    if (/^[\d\s.,:;%]+$/.test(tex)) return null // 纯数字：$100、$1,000.00 是金额不是公式
+    if (!MATH_SIGNAL.test(tex)) return null // 没有字母/运算符/符号 → 判为金额（「我花了 $5 买了 $10 的」）
+    return tex
+  }
+  const mathInlineRule = (state, silent) => {
+    const src = state.src
+    const pos = state.pos
+    let open = ''
+    if (src.charCodeAt(pos) === 0x24) open = src.charCodeAt(pos + 1) === 0x24 ? '$$' : '$'
+    else if (src.charCodeAt(pos) === 0x5c && src.charCodeAt(pos + 1) === 0x28) open = '\\('
+    else return false
+    const close = open === '$$' ? '$$' : open === '$' ? '$' : '\\)'
+    let i = pos + open.length
+    let end = -1
+    while (i < state.posMax) {
+      const c = src.charCodeAt(i)
+      if (c === 0x0a) break // 行内公式不跨行
+      if (src.startsWith(close, i)) {
+        end = i
+        break
+      }
+      if (c === 0x5c) {
+        i += 2 // 跳过转义，避免把 \$ 当成闭合
+        continue
+      }
+      i++
+    }
+    if (end < 0) return false
+    const tex = mathTex(src.slice(pos + open.length, end))
+    if (!tex) return false
+    if (!silent) {
+      const token = state.push('math_inline', 'math', 0)
+      token.content = tex
+      token.markup = close
+    }
+    state.pos = end + close.length
+    return true
+  }
+  const mathBlockRule = (state, startLine, endLine, silent) => {
+    if (state.sCount[startLine] - state.blkIndent >= 4) return false // 缩进 4 空格属代码块
+    const begin = state.bMarks[startLine] + state.tShift[startLine]
+    const first = state.src.slice(begin, state.eMarks[startLine])
+    let close = ''
+    if (first.startsWith('$$')) close = '$$'
+    else if (first.startsWith('\\[')) close = '\\]'
+    else return false
+
+    const rest = first.slice(2)
+    const sameLine = rest.indexOf(close)
+    let body = ''
+    let lastLine = startLine
+    if (sameLine >= 0) {
+      if (rest.slice(sameLine + close.length).trim() !== '') return false // 闭合后还有内容 → 交给行内规则
+      body = rest.slice(0, sameLine)
+    } else {
+      const parts = [rest]
+      let closed = false
+      for (let i = startLine + 1; i < endLine; i++) {
+        const text = state.src.slice(state.bMarks[i] + state.tShift[i], state.eMarks[i])
+        lastLine = i
+        const k = text.indexOf(close)
+        if (k >= 0) {
+          parts.push(text.slice(0, k))
+          closed = true
+          break
+        }
+        parts.push(text)
+      }
+      if (!closed) return false
+      body = parts.join('\n')
+    }
+    const tex = mathTex(body)
+    if (!tex) return false
+    if (silent) return true
+    const token = state.push('math_block', 'math', 0)
+    token.block = true
+    token.content = tex
+    token.map = [startLine, lastLine + 1]
+    token.markup = close
+    state.line = lastLine + 1
+    return true
+  }
+  // 独立成段的公式居中并允许横向滚动（与宽表格同一套做法，公众号实测支持）
+  const MATH_BLOCK = 'margin:1.15em 8px;text-align:center;overflow-x:auto;'
+  const MATH_PENDING = 'color:#a1a1aa;font-size:0.92em;'
+  const renderMathToken = (token, display) => {
+    const line = dl(token)
+    const svg = renderMath(token.content, display)
+    if (svg) {
+      return display ? `<section${line} style="${escapeHtmlAttr(MATH_BLOCK)}">${svg}</section>` : svg
+    }
+    // MathJax 尚未加载完：先原样显示公式源码，加载完会自动整篇重渲染。
+    // 不假装成功，也不静默丢内容；data-math-pending 让验收脚本能精确断言"这是占位态"。
+    const src = esc(display ? `$$${token.content}$$` : `$${token.content}$`)
+    return display
+      ? `<section${line} data-math-pending="1" style="${escapeHtmlAttr(MATH_BLOCK + MATH_PENDING)}">${src}</section>`
+      : `<span data-math-pending="1" style="${escapeHtmlAttr(MATH_PENDING)}">${src}</span>`
+  }
+  if (mathEnabled) {
+    // 注册在 escape 之前：否则 \(…\) 会先被 markdown 的转义规则吃掉反斜杠。
+    // 不必担心抢走行内代码——扫描是按位置推进的，`$x$` 这类行内代码会被 backticks
+    // 整体消费掉，里面的 $ 根本不会被访问到（tests/math.test.js 有该用例）。
+    md.inline.ruler.before('escape', 'math_inline', mathInlineRule)
+    md.block.ruler.before('fence', 'math_block', mathBlockRule, {
+      alt: ['paragraph', 'reference', 'blockquote', 'list'],
+    })
+    md.renderer.rules.math_inline = (tokens, idx) => renderMathToken(tokens[idx], false)
+    md.renderer.rules.math_block = (tokens, idx) => renderMathToken(tokens[idx], true)
   }
 
   // ---- 图库排版：连续图片自动拼成并排 / 网格布局 ----
@@ -951,6 +1070,7 @@ export function renderMarkdown(src, theme, opts = {}) {
     normalizeGalleryMode(opts.galleryMode),
     normalizeGalleryRatio(opts.galleryRatio),
     opts.linkFootnotes ? 1 : 0,
+    opts.math === false ? 0 : 1,
     JSON.stringify(opts.custom || {}),
   ].join('|')
   let entry = cache.get(key)
